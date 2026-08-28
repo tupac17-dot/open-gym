@@ -10,6 +10,31 @@ Plan your week, run guided workouts, track every set and your body weight over t
 on your phone, synced across devices, behind your own passkey login.
 No account on someone else's server, no subscription, no ads. Just `docker compose up`.
 
+## Recent Changes
+
+We're excited to share some great improvements and new features that have been added:
+
+- **Admin User Groups:** You can now establish user groups with group-based plan permissions, making management easier!
+- **Plan Editing Controls:** Enjoy enhanced flexibility with global, group, and individual plan-editing controls.
+- **Account Expiration Dates:** Admins can now set expiration dates for accounts and promote users more efficiently.
+- **Self-Admin Access Prevention:** We’ve added a safeguard to prevent admins from accidentally removing their own admin access.
+- **Push Notifications:** Stay informed with targeted push notifications and a convenient notification inbox right on the Home page.
+- **Logout Options:** Quickly log out from Home and navigate seamlessly with the new admin tab.
+- **App Customization:** Configure your app's name directly from the Admin dashboard for a personalized touch.
+- **Crash Fixes:** Addressed issues related to malformed states and navigation from Admin to Home.
+
+### Exciting Greek Language Support
+- Introducing Greek language support with an **Ελληνικά** selector option!
+- Experience Greek date formatting and a Greek UI locale.
+- For those who prefer English, we’ve ensured an English fallback for exercise instructions.
+
+### Translations in Plan/Admin Actions
+- We’ve translated newer actions, including:
+  - Assign to User
+  - All Routines
+  - My Plans
+  - Plan management tooltips and actions.
+
 <br>
 
 [![License: AGPL v3](https://img.shields.io/badge/license-AGPL--3.0-a3e635?style=flat-square)](LICENSE)

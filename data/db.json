@@ -1,23 +1,108 @@
 {
   "users": [
     {
-      "id": "piYdx5GveQarq8u9",
-      "name": "Arvids",
-      "created": "2026-08-03T18:06:47.577Z"
+      "id": "zW3tMCTdhs8GQLEq",
+      "name": "CharitosAndreou",
+      "created": "2026-08-24T10:33:12.133Z"
+    },
+    {
+      "id": "3XTcAi8ADEKo9DGm",
+      "name": "User1",
+      "created": "2026-08-24T10:54:21.472Z",
+      "invitedBy": "E2F710DAB27F8B1F",
+      "expiresAt": "2026-10-05T00:00:00.000Z",
+      "sv": 1,
+      "planEditingOverride": false,
+      "disabled": false
     }
   ],
   "creds": [
     {
-      "id": "C6uzDI9fTw-1bkrKxRrE5A",
-      "userId": "piYdx5GveQarq8u9",
-      "publicKey": "pQECAyYgASFYILGzyXtDNpCm5RLWdzIv4SzW9YesW-wYavgxm-wfwANEIlgglzV7G_9d5CVZA5yzO0_Khrwi6ORUsXmssAPas3eT8-U",
+      "id": "xuPars7t-pAb3iwB9hfzOg",
+      "userId": "zW3tMCTdhs8GQLEq",
+      "publicKey": "pQECAyYgASFYILeyLeS3_HuKxpG_GpYt0CJXRpNgt1mYoefvWy-2INAAIlggJO9Wq1YLHOtqKDZ_kCli-j72tgOW5eWkbM4r-HepScw",
       "counter": 0,
       "transports": [
-        "internal",
-        "hybrid"
+        "hybrid",
+        "internal"
+      ]
+    },
+    {
+      "id": "rkhDVTy_Zy_9YGcrRCk7Bw",
+      "userId": "3XTcAi8ADEKo9DGm",
+      "publicKey": "pQECAyYgASFYIBa240zcxFbMcwLKeMRhz5i3L8eUvfdRPLaj9hFuhKn-Ilgga8CJOartjlAiKAnpC-AdgVbxs2MSzIc7vGDhJBv2wwg",
+      "counter": 0,
+      "transports": [
+        "hybrid",
+        "internal"
       ]
     }
   ],
-  "subs": [],
-  "invites": []
+  "subs": [
+    {
+      "userId": "zW3tMCTdhs8GQLEq",
+      "endpoint": "https://wns2-db5p.notify.windows.com/w/?token=BQYAAADI%2fFYwpURHCFIEr%2fZOZFz%2bKmg0dxZfdDRzynOSFNyMjWhnNbTvyq6Ujn0ESOC%2b3DlSv1W6P69%2f%2bTuzdp8Z3fcSqIu53xnD9km6OXQaiwv5GTgRZnbyZdF3hUpN6laIihIHRvsztIb%2b1bWY5vfma9HBhgPmj5VjYfmHHmBSLRD9AHBZAWNtdyhYhD%2bKziXgUmPd9H4fjPcG35%2bbuVYQMN2zrqgr8hqKXcRcbVytc5pVSqmldNr48ykghAV5BVyAE1CTHMu1HRaHHJXAdcUZoDeXtz8Rc5%2fAPOAqOUqitBv7xoyqRp51TThoRiNt3DLlr4s%3d",
+      "keys": {
+        "p256dh": "BNhkJ5N7wZtPAblFsz00OE_z38MiWxgDLH-sL3plzE8DSTBoQ5iJcvOQjjgjwu3-ui60FS1eqvWJTM_TNOfemJY",
+        "auth": "MN_RsSGdGDT1vvavMwokvQ"
+      },
+      "created": "2026-08-24T12:57:10.820Z"
+    },
+    {
+      "userId": "zW3tMCTdhs8GQLEq",
+      "endpoint": "https://wns2-db5p.notify.windows.com/w/?token=BQYAAAATjNZHz7d%2fjafwolICtHU5xiPGaJff7jxZfkxjX79j99DnkZ%2bU%2fZ7YNFZBm%2bDZqXvNwrm%2b%2biHRsYRTebT4n3rhrkwgF0lZ99aP%2brI44P62%2fWixoH0T59Y8Rt3T%2feSsvvMEQPnZrpKZbMDbqfxIADI6djE7OASNvbInzshMNwUiIxS%2bimAw9P13crZ37OHAPYGO6a3t8KEQHUTde0WkU9PfhClzd2QxQ75sNTAHlxuArdOzNmNXLSQnZLUmMoysyjfdR6bpLBwuJ2vj2agHgtpJX6sQOHG8nbuXlVVOXu1JEYPCNM5aBvRAVuPZdNaOCIA%3d",
+      "keys": {
+        "p256dh": "BAfduVMFXPFbP7tXs2t6Idm6l2DpzzIkVert05-w36vSXgFdNgKwuvjSo0PCLBZ311sok1YfpRySNdiXzE-51aU",
+        "auth": "-FjZCfobm3PZX-zaPUe4lw"
+      },
+      "created": "2026-08-28T08:14:21.494Z"
+    }
+  ],
+  "invites": [
+    {
+      "code": "E2F710DAB27F8B1F",
+      "note": "",
+      "createdBy": "zW3tMCTdhs8GQLEq",
+      "created": "2026-08-24T10:51:51.568Z",
+      "usedBy": "3XTcAi8ADEKo9DGm",
+      "usedAt": "2026-08-24T10:54:21.472Z"
+    }
+  ],
+  "plans": [],
+  "groups": [
+    {
+      "id": "grp_6c85da2d2ba8",
+      "name": "Beginers",
+      "planEditingEnabled": true,
+      "memberIds": [
+        "3XTcAi8ADEKo9DGm"
+      ]
+    }
+  ],
+  "settings": {
+    "invitedPlanEditingEnabled": true,
+    "appName": "Expose"
+  },
+  "notifications": [
+    {
+      "id": "ntf_001c68b85ad6c867",
+      "userId": "zW3tMCTdhs8GQLEq",
+      "title": "openGym",
+      "body": "gfh",
+      "tag": "admin-broadcast",
+      "url": "/",
+      "created": "2026-08-24T12:59:11.378Z",
+      "readAt": "2026-08-24T12:59:18.538Z"
+    },
+    {
+      "id": "ntf_061f4caf13fb2d08",
+      "userId": "3XTcAi8ADEKo9DGm",
+      "title": "openGym",
+      "body": "gfh",
+      "tag": "admin-broadcast",
+      "url": "/",
+      "created": "2026-08-24T12:59:11.378Z",
+      "readAt": null
+    }
+  ]
 }

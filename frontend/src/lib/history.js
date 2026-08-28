@@ -159,15 +159,19 @@ export function bestWeightFor(S, exId) {
   return best
 }
 export function effectiveRoutineId(S, iso) {
-  const ov = S.dayPlan[iso]
+  const dayPlan = S?.dayPlan && typeof S.dayPlan === 'object' ? S.dayPlan : {}
+  const routines = Array.isArray(S?.routines) ? S.routines : []
+  const week = S?.week && typeof S.week === 'object' ? S.week : {}
+  const ov = dayPlan[iso]
   if (ov === 'rest') return null
-  if (ov && S.routines.some(r => r.id === ov)) return ov
+  if (ov && routines.some(r => r.id === ov)) return ov
   const wd = new Date(iso + 'T12:00:00').getDay()
-  return S.week[wd] || null
+  return week[wd] || null
 }
 export function effectiveRoutine(S, iso) {
   const id = effectiveRoutineId(S, iso)
-  return id ? S.routines.find(r => r.id === id) || null : null
+  const routines = Array.isArray(S?.routines) ? S.routines : []
+  return id ? routines.find(r => r.id === id) || null : null
 }
 export function buildSets(S, cfg) {
   const last = lastEntryFor(S, cfg.id)
@@ -217,10 +221,13 @@ export function setsDone(w) {
 }
 export function setsDoneActive(A) {
   let n = 0
-  if (A) A.entries.forEach(e => e.sets.forEach(s => { if (s.done) n++ }))
+  if (A && Array.isArray(A.entries)) A.entries.forEach(e => (e.sets || []).forEach(s => { if (s.done) n++ }))
   return n
 }
-export const lastBW = S => (S.bodyweight.length ? S.bodyweight[S.bodyweight.length - 1] : null)
+export const lastBW = S => {
+  const bodyweight = Array.isArray(S?.bodyweight) ? S.bodyweight : []
+  return bodyweight.length ? bodyweight[bodyweight.length - 1] : null
+}
 
 // Group consecutive items sharing a superset id (sg) into "units" of indices.
 // items may be routine exercises ({sg}) or active-workout entries ({sg}).
@@ -236,8 +243,9 @@ export function supersetUnits(items) {
 export function unitOf(units, idx) { return units.find(u => u.includes(idx)) || [idx] }
 
 export function streakWeeks(S) {
-  if (!S.workouts.length) return 0
-  const weeks = new Set(S.workouts.map(w => weekKey(w.d)))
+  const workouts = Array.isArray(S?.workouts) ? S.workouts : []
+  if (!workouts.length) return 0
+  const weeks = new Set(workouts.map(w => weekKey(w.d)))
   let streak = 0
   const cur = new Date()
   for (let i = 0; i < 520; i++) {

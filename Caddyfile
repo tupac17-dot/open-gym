@@ -1,0 +1,4 @@
+# Replace with your actual domain or DuckDNS subdomain
+exposefitness.duckdns.org {
+    reverse_proxy web:80
+}

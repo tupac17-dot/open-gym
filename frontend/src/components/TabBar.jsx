@@ -18,7 +18,7 @@ export default function TabBar({ onStart }) {
   const startWorkout = () => {
     if (!S.active) {
       const r = effectiveRoutine(S, todayISO())
-      if (r && r.ex.length) { onStart(r.id); return }
+      if (r && Array.isArray(r.ex) && r.ex.length) { onStart(r.id); return }
     }
     nav('/workout')
   }
@@ -38,6 +38,7 @@ export default function TabBar({ onStart }) {
       </button>
       <Tab k="stats" icon="chart" to="/stats" label={t('Stats')} />
       <Tab k="library" icon="list" to="/library" label={t('Exercises')} />
+      {user?.admin && <Tab k="admin" icon="wrench" to="/admin" label={t('Admin')} />}
     </nav>
   )
 }

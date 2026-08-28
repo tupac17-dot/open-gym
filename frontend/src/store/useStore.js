@@ -4,6 +4,7 @@ import { localTZ } from '../lib/format.js'
 import { registerCustom } from '../lib/exercises.js'
 import { DEMO, DEMO_SEEDED } from '../lib/demo.js'
 import { MOBILE, nativeLoad, nativeSave, syncReminder } from '../lib/mobile.js'
+import { ensureUserPlans, syncActivePlan } from '../lib/plan-manager.js'
 
 const KEY = 'gym_state_v1'
 export const DEF = {
@@ -15,19 +16,39 @@ export const DEF = {
   // that a profile which never chose (loaded state is overlaid on DEF, on every path: local,
   // server pull, backup import) still falls back to the `showRir` boolean this replaced and
   // keeps the column it had. See effortOf.
-  reminder: { on: false, time: '08:00', tz: null }, effort: null
+  reminder: { on: false, time: '08:00', tz: null }, effort: null,
+  plans: [], activePlanId: null, allRoutines: []
 }
+const DEFAULT_CONFIG = { appName: 'openGym', invite_only: false }
 const clone = o => JSON.parse(JSON.stringify(o))
+const normalizeConfig = c => ({ ...DEFAULT_CONFIG, ...(c || {}), appName: String(c?.appName || DEFAULT_CONFIG.appName).trim() || DEFAULT_CONFIG.appName })
+
+function normalizeState(S) {
+  const next = Object.assign(clone(DEF), S || {})
+  for (const key of ['bodyweight', 'routines', 'workouts', 'customEx', 'plans', 'allRoutines']) {
+    if (!Array.isArray(next[key])) next[key] = []
+  }
+  for (const key of ['week', 'dayPlan', 'exWeights']) {
+    if (!next[key] || typeof next[key] !== 'object' || Array.isArray(next[key])) next[key] = {}
+  }
+  if (next.active && !Array.isArray(next.active.entries)) next.active = { ...next.active, entries: [] }
+  if (!next.reminder || typeof next.reminder !== 'object' || Array.isArray(next.reminder)) next.reminder = clone(DEF.reminder)
+  ensureUserPlans(next)
+  return next
+}
 
 function loadState() {
   try {
     const raw = localStorage.getItem(KEY)
-    if (raw) return Object.assign(clone(DEF), JSON.parse(raw))
+    if (raw) {
+      return normalizeState(JSON.parse(raw))
+    }
   } catch (e) { /* ignore */ }
-  return clone(DEF)
+  return normalizeState()
 }
 
-const hasData = st => !!((st.workouts || []).length || (st.routines || []).length || (st.bodyweight || []).length)
+const hasData = st => !!((st.workouts || []).length || (st.routines || []).length || (st.bodyweight || []).length || (st.plans || []).length)
+const planFingerprint = st => JSON.stringify({ routines: st.routines || [], week: st.week || {}, dayPlan: st.dayPlan || {}, customEx: st.customEx || [], plans: st.plans || [], activePlanId: st.activePlanId || null, allRoutines: st.allRoutines || [] })
 
 export const useStore = create((set, get) => {
   let pushTm = null
@@ -41,10 +62,12 @@ export const useStore = create((set, get) => {
   }
 
   const persist = (S, push = true) => {
-    S._ts = Date.now()
-    registerCustom(S.customEx)
-    localStorage.setItem(KEY, JSON.stringify(S))
-    set({ S })
+    const next = normalizeState(S)
+    syncActivePlan(next)
+    next._ts = Date.now()
+    registerCustom(next.customEx)
+    localStorage.setItem(KEY, JSON.stringify(next))
+    set({ S: next })
     if (MOBILE) nativePersist()
     if (push && get().user) {
       clearTimeout(pushTm)
@@ -71,26 +94,48 @@ export const useStore = create((set, get) => {
   })
 
   // Everything a sign-out leaves behind on this device, whichever way it was triggered.
+  // IMPORTANT: we must NOT call persist() here because persist runs ensureUserPlans
+  // which auto-creates a default "My Plan" and stamps _ts = Date.now(). That fresh
+  // timestamp would make pullState think the local (empty) state is newer than the
+  // server copy, so the real data would be silently discarded on next login.
   const clearLocalSession = () => {
     get().setUser(null)
     localStorage.removeItem('gym_guest')
     localStorage.removeItem('gym_dirty')
     localStorage.removeItem(KEY)
-    persist(clone(DEF), false)
+    const fresh = clone(DEF)
+    // No _ts — pullState must see this as "no data" so it always accepts the server copy
+    delete fresh._ts
+    set({ S: fresh })
   }
 
   return {
     S: (() => { const s = loadState(); registerCustom(s.customEx); return s })(),
     user: (() => { try { return JSON.parse(localStorage.getItem('gym_user')) || null } catch { return null } })(),
+    config: DEFAULT_CONFIG,
     ready: false,
+
+    setConfig(c) { set(s => ({ config: normalizeConfig({ ...s.config, ...c }) })) },
+    async loadConfig() {
+      const c = await api('/api/config')
+      get().setConfig(c)
+      return c
+    },
 
     // Mutate a draft of S via producer fn, then persist + schedule sync.
     update(mut, push = true) {
       const S = clone(get().S)
+      const before = planFingerprint(S)
       mut(S)
+      const u = get().user
+      if (u?.invited && u.canEditPlans === false && planFingerprint(S) !== before) return
       persist(S, push)
     },
-    replaceState(S, push = false) { persist(clone(S), push) },
+    replaceState(S, push = false) {
+      const next = clone(S), u = get().user
+      if (u?.invited && u.canEditPlans === false && planFingerprint(next) !== planFingerprint(get().S)) return
+      persist(normalizeState(next), push)
+    },
 
     isGuest: () => localStorage.getItem('gym_guest') === '1',
     setGuest(v) { if (v) localStorage.setItem('gym_guest', '1'); else localStorage.removeItem('gym_guest'); set({}) },
@@ -114,7 +159,7 @@ export const useStore = create((set, get) => {
         const dirty = localStorage.getItem('gym_dirty') === '1'
         if (state && (!hasData(S) || ((state._ts || 0) >= (S._ts || 0) && !dirty))) {
           const active = S.active
-          const next = Object.assign(clone(DEF), state)
+          const next = normalizeState(state)
           if (active) next.active = active
           persist(next, false)
         } else if (hasData(S)) { await get().pushState() }
@@ -172,6 +217,7 @@ export const useStore = create((set, get) => {
         set({ ready: true })
         return
       }
+      await get().loadConfig().catch(() => {})
       try {
         const me = await api('/api/me')
         get().setUser(me.user)

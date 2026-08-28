@@ -36,11 +36,36 @@ if (!fs.existsSync(secretFile)) fs.writeFileSync(secretFile, crypto.randomBytes(
 const SECRET = fs.readFileSync(secretFile, 'utf8').trim();
 
 const dbFile = path.join(DATA, 'db.json');
-let db = { users: [], creds: [], subs: [], invites: [] };
+let db = { users: [], creds: [], subs: [], invites: [], plans: [], groups: [], settings: {}, notifications: [] };
 try { db = JSON.parse(fs.readFileSync(dbFile, 'utf8')); } catch {}
 db.subs = db.subs || [];
 db.invites = db.invites || [];
+db.plans = db.plans || [];
+db.groups = db.groups || [];
+db.settings = db.settings || {};
+db.notifications = db.notifications || [];
+if (db.settings.invitedPlanEditingEnabled === undefined) db.settings.invitedPlanEditingEnabled = true;
+if (typeof db.settings.appName !== 'string' || !db.settings.appName.trim()) db.settings.appName = 'openGym';
 const isAdmin = user => !!user && (user.admin === true || ADMIN_UIDS.includes(user.id));
+const appName = () => String(db.settings.appName || 'openGym').trim().slice(0, 40) || 'openGym';
+const isExpired = user => !!user?.expiresAt && new Date(user.expiresAt).getTime() <= Date.now();
+function planFingerprint(state) {
+  if (!state) return '';
+  return JSON.stringify({ routines: state.routines || [], week: state.week || {}, dayPlan: state.dayPlan || {}, customEx: state.customEx || [], plans: state.plans || [], activePlanId: state.activePlanId || null, allRoutines: state.allRoutines || [] });
+}
+function canEditPlans(user) {
+  if (!user || isAdmin(user) || !user.invitedBy) return true;
+  if (isExpired(user)) return false;
+  const overrides = [];
+  if (user.planEditingOverride !== null && user.planEditingOverride !== undefined) overrides.push(!!user.planEditingOverride);
+  for (const g of db.groups) if ((g.memberIds || []).includes(user.id) && g.planEditingEnabled !== undefined) overrides.push(!!g.planEditingEnabled);
+  if (overrides.includes(false)) return false;
+  if (overrides.includes(true)) return true;
+  return db.settings.invitedPlanEditingEnabled !== false;
+}
+function publicUser(user) {
+  return { id: user.id, name: user.name, admin: isAdmin(user), invited: !!user.invitedBy, expiresAt: user.expiresAt || null, expired: isExpired(user), canEditPlans: canEditPlans(user) };
+}
 function saveDb() { atomicWrite(dbFile, JSON.stringify(db, null, 2)); }
 function atomicWrite(file, content) {
   const tmp = file + '.tmp';
@@ -256,12 +281,12 @@ const routes = {
   'GET /api/health': async (req, res) => json(res, 200, { ok: true, users: db.users.length }),
 
   // Public config the login screen needs before anyone is signed in.
-  'GET /api/config': async (req, res) => json(res, 200, { invite_only: INVITE_ONLY }),
+  'GET /api/config': async (req, res) => json(res, 200, { invite_only: INVITE_ONLY, appName: appName() }),
 
   'GET /api/me': async (req, res) => {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
-    json(res, 200, { user: { id: user.id, name: user.name, admin: isAdmin(user) } });
+    json(res, 200, { user: publicUser(user) });
   },
 
   'POST /api/register/options': async (req, res) => {
@@ -273,7 +298,7 @@ const routes = {
       return json(res, 403, { error: 'a valid invite code is required' });
     const uid = crypto.randomBytes(12).toString('base64url');
     const options = await generateRegistrationOptions({
-      rpName: RP_NAME, rpID: RP_ID,
+      rpName: appName() || RP_NAME, rpID: RP_ID,
       userID: Buffer.from(uid), userName: name, userDisplayName: name,
       attestationType: 'none',
       authenticatorSelection: { residentKey: 'required', userVerification: 'preferred' },
@@ -306,7 +331,7 @@ const routes = {
       invite = db.invites.find(i => i.code === c.code && !i.usedBy && !i.revoked);
       if (!invite) return json(res, 403, { error: 'invite code is no longer valid — ask for a new one' });
     }
-    const user = { id: c.uid, name: c.name, created: new Date().toISOString() };
+    const user = { id: c.uid, name: c.name, created: new Date().toISOString(), planEditingOverride: null, expiresAt: null };
     if (invite) { user.invitedBy = invite.code; invite.usedBy = user.id; invite.usedAt = user.created; }
     db.users.push(user);
     db.creds.push({
@@ -315,8 +340,27 @@ const routes = {
       counter: credential.counter || 0,
       transports: body.credential?.response?.transports || []
     });
+    if (invite?.plan) {
+      const plan = invite.plan;
+      const initialState = {
+        unit: 'kg', restSec: 90, sound: true, keepAwake: true, lang: 'en',
+        theme: 'dark', accent: 'lime', body: 'male', targetW: null,
+        bodyweight: [],
+        routines: Array.isArray(plan.routines) ? plan.routines : [],
+        week: (typeof plan.week === 'object' && plan.week) ? plan.week : {},
+        dayPlan: {},
+        exWeights: {},
+        workouts: [],
+        customEx: Array.isArray(plan.customEx) ? plan.customEx : [],
+        gifSize: 'full',
+        reminder: { on: false, time: '08:00', tz: null },
+        effort: null,
+        _ts: Date.now()
+      };
+      atomicWrite(stateFile(user.id), JSON.stringify(initialState));
+    }
     saveDb();
-    json(res, 200, { user: { id: user.id, name: user.name, admin: isAdmin(user) } }, { 'Set-Cookie': sessionCookie(user) });
+    json(res, 200, { user: publicUser(user) }, { 'Set-Cookie': sessionCookie(user) });
   },
 
   'POST /api/login/options': async (req, res) => {
@@ -355,7 +399,7 @@ const routes = {
     const user = db.users.find(u => u.id === cred.userId);
     if (!user) return json(res, 500, { error: 'user missing' });
     if (user.disabled) return json(res, 403, { error: 'this account has been disabled' });
-    json(res, 200, { user: { id: user.id, name: user.name, admin: isAdmin(user) } }, { 'Set-Cookie': sessionCookie(user) });
+    json(res, 200, { user: publicUser(user) }, { 'Set-Cookie': sessionCookie(user) });
   },
 
   'POST /api/logout': async (req, res) => json(res, 200, { ok: true }, { 'Set-Cookie': clearCookie }),
@@ -386,6 +430,10 @@ const routes = {
     if (!user) return json(res, 401, { error: 'not signed in' });
     const body = await readBody(req);
     if (!body.state || typeof body.state !== 'object') return json(res, 400, { error: 'state required' });
+    if (!canEditPlans(user)) {
+      const current = readState(user.id) || {};
+      if (planFingerprint(current) !== planFingerprint(body.state)) return json(res, 403, { error: 'plan and routine editing is disabled by an administrator' });
+    }
     delete body.state.active;              // in-progress workouts stay device-local
     atomicWrite(stateFile(user.id), JSON.stringify(body.state));
     json(res, 200, { ok: true, ts: body.state._ts || null });
@@ -417,7 +465,7 @@ const routes = {
   'POST /api/push/test': async (req, res) => {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
-    await sendPush(user.id, { title: 'openGym', body: 'Test notification ✅ — this is what alerts look like.', tag: 'test' });
+    await sendPush(user.id, { title: appName(), body: 'Test notification ✅ — this is what alerts look like.', tag: 'test' });
     json(res, 200, { ok: true });
   },
 
@@ -466,6 +514,9 @@ const routes = {
       return {
         id: u.id, name: u.name, created: u.created || null,
         disabled: !!u.disabled, admin: isAdmin(u), invitedBy: u.invitedBy || null,
+        expiresAt: u.expiresAt || null, expired: isExpired(u), canEditPlans: canEditPlans(u),
+        planEditingOverride: u.planEditingOverride === undefined ? null : u.planEditingOverride,
+        groups: db.groups.filter(g => (g.memberIds || []).includes(u.id)).map(g => ({ id: g.id, name: g.name, planEditingEnabled: g.planEditingEnabled })),
         workouts: workouts.length,
         lastWorkout: last ? last.d : null,
         lastSync: S._ts || null,
@@ -476,6 +527,126 @@ const routes = {
     json(res, 200, { users, invite_only: INVITE_ONLY, now: Date.now() });
   },
 
+  'GET /api/notifications': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    const notifications = db.notifications.filter(n => n.userId === user.id).sort((a, b) => new Date(b.created) - new Date(a.created)).slice(0, 100);
+    json(res, 200, { notifications, unread: notifications.filter(n => !n.readAt).length });
+  },
+
+  'POST /api/notifications/read': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    const body = await readBody(req);
+    const now = new Date().toISOString();
+    let count = 0;
+    for (const n of db.notifications) {
+      if (n.userId !== user.id || n.readAt) continue;
+      if (body.all || (body.id && n.id === body.id)) { n.readAt = now; count++; }
+    }
+    if (count) saveDb();
+    json(res, 200, { ok: true, count });
+  },
+
+  'GET /api/admin/settings': async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    json(res, 200, { settings: { invitedPlanEditingEnabled: db.settings.invitedPlanEditingEnabled !== false, appName: appName() } });
+  },
+
+  'PUT /api/admin/settings': async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const body = await readBody(req);
+    if (body.invitedPlanEditingEnabled !== undefined) db.settings.invitedPlanEditingEnabled = !!body.invitedPlanEditingEnabled;
+    if (body.appName !== undefined) {
+      const name = String(body.appName || '').trim().slice(0, 40);
+      if (!name) return json(res, 400, { error: 'app name required' });
+      db.settings.appName = name;
+    }
+    saveDb();
+    json(res, 200, { settings: { invitedPlanEditingEnabled: db.settings.invitedPlanEditingEnabled !== false, appName: appName() } });
+  },
+
+  'GET /api/admin/groups': async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    json(res, 200, { groups: db.groups.map(g => ({ ...g, memberIds: g.memberIds || [], members: (g.memberIds || []).map(id => db.users.find(u => u.id === id)?.name).filter(Boolean) })) });
+  },
+
+  'POST /api/admin/groups': async (req, res) => {
+    const admin = requireAdmin(req, res); if (!admin) return;
+    const body = await readBody(req);
+    const name = String(body.name || '').trim().slice(0, 60);
+    if (!name) return json(res, 400, { error: 'group name required' });
+    if (db.groups.some(g => g.name.toLowerCase() === name.toLowerCase())) return json(res, 409, { error: 'group already exists' });
+    const group = { id: 'grp_' + crypto.randomBytes(6).toString('hex'), name, planEditingEnabled: body.planEditingEnabled !== false, memberIds: [] };
+    db.groups.push(group); saveDb(); json(res, 200, { group });
+  },
+
+  'PUT /api/admin/groups': async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const body = await readBody(req); const g = db.groups.find(x => x.id === body.id);
+    if (!g) return json(res, 404, { error: 'group not found' });
+    if (body.name !== undefined) g.name = String(body.name).trim().slice(0, 60) || g.name;
+    if (body.planEditingEnabled !== undefined) g.planEditingEnabled = !!body.planEditingEnabled;
+    if (Array.isArray(body.memberIds)) g.memberIds = [...new Set(body.memberIds.filter(id => db.users.some(u => u.id === id)))];
+    saveDb(); json(res, 200, { group: g });
+  },
+
+  'DELETE /api/admin/groups': async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const body = await readBody(req); const before = db.groups.length;
+    db.groups = db.groups.filter(g => g.id !== body.id);
+    if (db.groups.length === before) return json(res, 404, { error: 'group not found' });
+    saveDb(); json(res, 200, { ok: true });
+  },
+
+  'PUT /api/admin/user/permissions': async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const body = await readBody(req); const u = db.users.find(x => x.id === body.id);
+    if (!u) return json(res, 404, { error: 'no such user' });
+    if (body.planEditingOverride !== undefined && body.planEditingOverride !== null && typeof body.planEditingOverride !== 'boolean') return json(res, 400, { error: 'planEditingOverride must be true, false, or null' });
+    u.planEditingOverride = body.planEditingOverride === undefined ? null : body.planEditingOverride;
+    saveDb(); json(res, 200, { ok: true, user: publicUser(u) });
+  },
+
+  'PUT /api/admin/user/expiry': async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const body = await readBody(req); const u = db.users.find(x => x.id === body.id);
+    if (!u) return json(res, 404, { error: 'no such user' });
+    if (body.expiresAt) { const d = new Date(body.expiresAt); if (Number.isNaN(d.getTime())) return json(res, 400, { error: 'invalid expiration date' }); u.expiresAt = d.toISOString(); }
+    else u.expiresAt = null;
+    u.sv = sessionVersion(u) + 1; saveDb(); json(res, 200, { ok: true, user: publicUser(u) });
+  },
+
+  'PUT /api/admin/user/role': async (req, res) => {
+    const admin = requireAdmin(req, res); if (!admin) return;
+    const body = await readBody(req); const u = db.users.find(x => x.id === body.id);
+    if (!u) return json(res, 404, { error: 'no such user' });
+    const makeAdmin = !!body.admin;
+    if (!makeAdmin && u.id === admin.id) return json(res, 400, { error: 'cannot remove your own admin access' });
+    if (!makeAdmin && isAdmin(u) && db.users.filter(isAdmin).length <= 1) return json(res, 400, { error: 'cannot remove the last admin' });
+    u.admin = makeAdmin; saveDb(); json(res, 200, { ok: true, user: publicUser(u) });
+  },
+
+  'POST /api/admin/notifications': async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const body = await readBody(req);
+    const title = String(body.title || '').trim().slice(0, 100), message = String(body.body || '').trim().slice(0, 500);
+    if (!title || !message) return json(res, 400, { error: 'title and body are required' });
+    let ids = db.users.map(u => u.id);
+    if (body.userIds) ids = Array.isArray(body.userIds) ? body.userIds : [body.userIds];
+    if (body.groupIds) {
+      const selected = new Set(body.groupIds);
+      ids = db.groups.filter(g => selected.has(g.id)).flatMap(g => g.memberIds || []);
+    }
+    ids = [...new Set(ids)].filter(id => db.users.some(u => u.id === id));
+    const payload = { title, body: message, tag: String(body.tag || 'admin-broadcast').slice(0, 50), url: String(body.url || '/').slice(0, 200) };
+    const created = new Date().toISOString();
+    for (const userId of ids) db.notifications.push({ id: 'ntf_' + crypto.randomBytes(8).toString('hex'), userId, title, body: message, tag: payload.tag, url: payload.url, created, readAt: null });
+    saveDb();
+    await Promise.all(ids.map(id => sendPush(id, payload)));
+    json(res, 200, { ok: true, targeted: ids.length, subscribed: ids.filter(id => db.subs.some(s => s.userId === id)).length });
+  },
+
   // Drill-down: full workout history + body-weight log for one user.
   'GET /api/admin/user': async (req, res) => {
     if (!requireAdmin(req, res)) return;
@@ -484,13 +655,58 @@ const routes = {
     if (!u) return json(res, 404, { error: 'no such user' });
     const S = readState(u.id) || {};
     json(res, 200, {
-      user: { id: u.id, name: u.name, created: u.created || null, disabled: !!u.disabled, admin: isAdmin(u), invitedBy: u.invitedBy || null },
+      user: { ...publicUser(u), created: u.created || null, disabled: !!u.disabled, invitedBy: u.invitedBy || null, planEditingOverride: u.planEditingOverride === undefined ? null : u.planEditingOverride },
       unit: S.unit || 'kg',
       lastSync: S._ts || null,
-      routines: (S.routines || []).map(r => ({ id: r.id, name: r.name, emoji: r.emoji, count: (r.ex || []).length })),
+      week: S.week || {},
+      routines: (S.routines || []).map(r => ({ id: r.id, name: r.name, emoji: r.emoji, count: (r.ex || []).length, ex: r.ex || [] })),
       bodyweight: S.bodyweight || [],
       workouts: (S.workouts || []).slice().reverse()   // newest first for display
     });
+  },
+
+  'POST /api/admin/user/plan': async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const body = await readBody(req);
+    const u = db.users.find(x => x.id === body.id);
+    if (!u) return json(res, 404, { error: 'no such user' });
+    const plan = body.plan;
+    if (!plan || typeof plan !== 'object') return json(res, 400, { error: 'valid plan required' });
+
+    let S = readState(u.id);
+    if (!S) {
+      S = {
+        unit: 'kg', restSec: 90, sound: true, keepAwake: true, lang: 'en',
+        theme: 'dark', accent: 'lime', body: 'male', targetW: null,
+        bodyweight: [], routines: [], week: {}, dayPlan: {},
+        exWeights: {}, workouts: [], customEx: [], gifSize: 'full',
+        reminder: { on: false, time: '08:00', tz: null }, effort: null
+      };
+    }
+    
+    const mode = body.mode || 'replace';
+    const newRoutines = Array.isArray(plan.routines) ? plan.routines : [];
+    const newWeek = (typeof plan.week === 'object' && plan.week) ? plan.week : {};
+    const newCustomEx = Array.isArray(plan.customEx) ? plan.customEx : [];
+
+    if (mode === 'replace') {
+      S.routines = newRoutines;
+      S.week = newWeek;
+    } else {
+      S.routines = (S.routines || []).concat(newRoutines);
+      S.week = { ...(S.week || {}), ...newWeek };
+    }
+
+    S.customEx = S.customEx || [];
+    for (const c of newCustomEx) {
+      if (c && c.id && !S.customEx.some(x => x.id === c.id)) {
+        S.customEx.push(c);
+      }
+    }
+
+    S._ts = Date.now();
+    atomicWrite(stateFile(u.id), JSON.stringify(S));
+    json(res, 200, { ok: true, routines: S.routines.length });
   },
 
   'POST /api/admin/user/disable': async (req, res) => {
@@ -509,7 +725,9 @@ const routes = {
     if (!requireAdmin(req, res)) return;
     // resolve usedBy uid → name for display
     const invites = db.invites.map(i => ({
-      ...i, usedByName: i.usedBy ? (db.users.find(u => u.id === i.usedBy) || {}).name || null : null
+      ...i,
+      usedByName: i.usedBy ? (db.users.find(u => u.id === i.usedBy) || {}).name || null : null,
+      planName: i.plan?.name || (i.plan ? (i.plan.routines?.length ? `${i.plan.routines.length} routines` : 'Custom plan') : null)
     }));
     json(res, 200, { invites, invite_only: INVITE_ONLY });
   },
@@ -523,7 +741,13 @@ const routes = {
     // good, so the code itself has to be the thing that isn't worth guessing. Codes already in
     // db.json keep working — validation is an exact string compare, never a length or format check.
     do { code = crypto.randomBytes(8).toString('hex').toUpperCase(); } while (db.invites.some(i => i.code === code));
-    const invite = { code, note: String(body.note || '').slice(0, 60), createdBy: admin.id, created: new Date().toISOString() };
+    const invite = {
+      code,
+      note: String(body.note || '').slice(0, 60),
+      createdBy: admin.id,
+      created: new Date().toISOString(),
+      plan: (body.plan && typeof body.plan === 'object') ? body.plan : null
+    };
     db.invites.push(invite);
     saveDb();
     json(res, 200, { invite });
@@ -538,6 +762,103 @@ const routes = {
     db.invites = db.invites.filter(i => i.code !== inv.code);
     saveDb();
     json(res, 200, { ok: true });
+  },
+
+  /* ---------- admin plan templates library ---------- */
+  'GET /api/admin/plans': async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const plans = (db.plans || []).map(p => ({
+      ...p,
+      routineCount: (p.routines || []).length,
+      scheduledDays: Object.keys(p.week || {}).filter(k => p.week[k]).length
+    }));
+    json(res, 200, { plans });
+  },
+
+  'POST /api/admin/plans': async (req, res) => {
+    const admin = requireAdmin(req, res); if (!admin) return;
+    const body = await readBody(req);
+    const id = 'plan_' + crypto.randomBytes(6).toString('hex');
+    const name = String(body.name || 'Untitled Plan').trim().slice(0, 60);
+    const description = String(body.description || '').trim().slice(0, 200);
+    const routines = Array.isArray(body.routines) ? body.routines : [];
+    const week = (typeof body.week === 'object' && body.week) ? body.week : {};
+    const customEx = Array.isArray(body.customEx) ? body.customEx : [];
+    const plan = {
+      id,
+      name,
+      description,
+      routines,
+      week,
+      customEx,
+      createdBy: admin.id,
+      created: new Date().toISOString(),
+      updated: new Date().toISOString()
+    };
+    db.plans = db.plans || [];
+    db.plans.push(plan);
+    saveDb();
+    json(res, 200, { plan });
+  },
+
+  'PUT /api/admin/plans': async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const body = await readBody(req);
+    db.plans = db.plans || [];
+    const plan = db.plans.find(p => p.id === body.id);
+    if (!plan) return json(res, 404, { error: 'plan not found' });
+    if (body.name !== undefined) plan.name = String(body.name).trim().slice(0, 60);
+    if (body.description !== undefined) plan.description = String(body.description).trim().slice(0, 200);
+    if (Array.isArray(body.routines)) plan.routines = body.routines;
+    if (typeof body.week === 'object' && body.week) plan.week = body.week;
+    if (Array.isArray(body.customEx)) plan.customEx = body.customEx;
+    plan.updated = new Date().toISOString();
+    saveDb();
+    json(res, 200, { plan });
+  },
+
+  'DELETE /api/admin/plans': async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const body = await readBody(req);
+    db.plans = db.plans || [];
+    const idx = db.plans.findIndex(p => p.id === body.id);
+    if (idx === -1) return json(res, 404, { error: 'plan not found' });
+    db.plans.splice(idx, 1);
+    saveDb();
+    json(res, 200, { ok: true });
+  },
+
+  'POST /api/admin/plans/clone-routine': async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const body = await readBody(req);
+    db.plans = db.plans || [];
+    const targetPlan = db.plans.find(p => p.id === body.targetPlanId);
+    if (!targetPlan) return json(res, 404, { error: 'target plan not found' });
+
+    let sourceRoutine = null;
+    if (body.sourcePlanId) {
+      const sourcePlan = db.plans.find(p => p.id === body.sourcePlanId);
+      if (sourcePlan && Array.isArray(sourcePlan.routines)) {
+        sourceRoutine = sourcePlan.routines.find(r => r.id === body.routineId);
+      }
+    } else if (body.routine && typeof body.routine === 'object') {
+      sourceRoutine = body.routine;
+    }
+
+    if (!sourceRoutine) return json(res, 404, { error: 'source routine not found' });
+
+    const newRoutineId = 'r_' + crypto.randomBytes(6).toString('hex');
+    const clonedRoutine = {
+      ...JSON.parse(JSON.stringify(sourceRoutine)),
+      id: newRoutineId,
+      name: body.name || sourceRoutine.name || 'Cloned Routine'
+    };
+
+    targetPlan.routines = targetPlan.routines || [];
+    targetPlan.routines.push(clonedRoutine);
+    targetPlan.updated = new Date().toISOString();
+    saveDb();
+    json(res, 200, { ok: true, plan: targetPlan, routine: clonedRoutine });
   }
 };
 

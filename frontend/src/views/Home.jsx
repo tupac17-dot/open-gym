@@ -1,6 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
+import { useUI } from '../store/useUI.js'
+import { confirmSheet } from '../sheets.jsx'
+import { api } from '../lib/api.js'
 import { effectiveRoutine, effectiveRoutineId, streakWeeks, lastBW, setsDoneActive } from '../lib/history.js'
 import { fmtNum, fmtDate, todayISO, isoOf, weekKey, DAYS } from '../lib/format.js'
 import { t, dateLocale } from '../lib/i18n.js'
@@ -10,27 +13,69 @@ import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
 import { glyphOf } from '../lib/glyphs.js'
 
+function NotificationSheet({ onRead, close }) {
+  const [items, setItems] = useState(null)
+  const toast = useUI(s => s.toast)
+  useEffect(() => { api('/api/notifications').then(d => setItems(d.notifications || [])).catch(e => toast(e.message || 'Could not load notifications')) }, [])
+  const markRead = async id => {
+    setItems(prev => prev?.map(n => n.id === id ? { ...n, readAt: n.readAt || new Date().toISOString() } : n))
+    onRead?.()
+    await api('/api/notifications/read', { method: 'POST', body: JSON.stringify({ id }) }).catch(() => {})
+  }
+  return <>
+    <div className="row between" style={{ marginBottom: 4 }}><div><h3 style={{ margin: 0 }}>Notifications</h3><div className="dim small">Admin announcements and workout alerts</div></div><button className="btn xs tinted" onClick={async () => { await api('/api/notifications/read', { method: 'POST', body: JSON.stringify({ all: true }) }).catch(() => {}); setItems(prev => prev?.map(n => ({ ...n, readAt: n.readAt || new Date().toISOString() }))); onRead?.() }}>Mark all read</button></div>
+    <div className="list" style={{ gap: 6, maxHeight: '62vh', overflowY: 'auto', marginTop: 14 }}>
+      {items === null && <div className="muted small">Loading…</div>}
+      {items?.map(n => <button key={n.id} type="button" className={'item' + (!n.readAt ? ' acc' : '')} onClick={() => markRead(n.id)} style={{ padding: '11px 12px', borderRadius: 10, textAlign: 'left', cursor: 'pointer', border: !n.readAt ? '1.5px solid var(--acc)' : '1px solid var(--sep)' }}>
+        <span className="lrow-i" style={{ background: !n.readAt ? 'var(--acc-soft)' : undefined }}><Icon name="bell" /></span>
+        <div className="grow"><div style={{ fontWeight: n.readAt ? 500 : 700 }}>{n.title}</div><div className="small" style={{ fontWeight: n.readAt ? 400 : 600, marginTop: 3, whiteSpace: 'pre-wrap' }}>{n.body}</div><div className="dim" style={{ fontSize: '.72rem', marginTop: 5 }}>{new Date(n.created).toLocaleString()}</div></div>
+        {!n.readAt && <span className="tag acc">New</span>}
+      </button>)}
+      {items?.length === 0 && <div className="empty small"><div className="ico"><Icon name="bell" /></div>No notifications yet.</div>}
+    </div>
+  </>
+}
+
+function NotificationBell({ user }) {
+  const openSheet = useUI(s => s.openSheet)
+  const [unread, setUnread] = useState(0)
+  const load = () => api('/api/notifications').then(d => setUnread(d.unread || 0)).catch(() => {})
+  useEffect(() => { if (!user) return; load(); const timer = setInterval(load, 30000); return () => clearInterval(timer) }, [user?.id])
+  if (!user) return null
+  return <button className="iconbtn notification-bell" onClick={() => openSheet(close => <NotificationSheet onRead={load} close={close} />)} aria-label={unread ? `${unread} unread notifications` : 'Notifications'} title="Notifications">
+    <Icon name="bell" />{unread > 0 && <span className="notification-badge">{unread > 99 ? '99+' : unread}</span>}
+  </button>
+}
+
 // Home = what to do now + a quick glance. Deep charts & history live in Stats.
 export default function Home() {
   const nav = useNavigate()
   const S = useStore(s => s.S)
   const user = useStore(s => s.user)
+  const appName = useStore(s => s.config.appName)
+  const signOut = useStore(s => s.signOut)
+  const toast = useUI(s => s.toast)
   const [weekOffset, setWeekOffset] = useState(0)
+  const workouts = Array.isArray(S.workouts) ? S.workouts : []
+  const bodyweight = Array.isArray(S.bodyweight) ? S.bodyweight : []
+  const routines = Array.isArray(S.routines) ? S.routines : []
+  const week = S.week && typeof S.week === 'object' ? S.week : {}
+  const dayPlan = S.dayPlan && typeof S.dayPlan === 'object' ? S.dayPlan : {}
 
   const today = new Date()
   const routine = effectiveRoutine(S, todayISO())
-  const todayOvr = S.dayPlan[todayISO()] !== undefined
+  const todayOvr = dayPlan[todayISO()] !== undefined
   const bw = lastBW(S)
-  const prevBW = S.bodyweight.length > 1 ? S.bodyweight[S.bodyweight.length - 2] : null
+  const prevBW = bodyweight.length > 1 ? bodyweight[bodyweight.length - 2] : null
   const delta = bw && prevBW ? bw.w - prevBW.w : null
 
   const monday = new Date(today); monday.setDate(today.getDate() - ((today.getDay() + 6) % 7) + weekOffset * 7)
-  const doneDays = new Set(S.workouts.map(w => w.d))
+  const doneDays = new Set(workouts.map(w => w.d))
   const strip = []
   for (let i = 0; i < 7; i++) {
     const d = new Date(monday); d.setDate(monday.getDate() + i)
     const iso = isoOf(d)
-    const eff = effectiveRoutineId(S, iso), ovr = S.dayPlan[iso] !== undefined, done = doneDays.has(iso)
+    const eff = effectiveRoutineId(S, iso), ovr = dayPlan[iso] !== undefined, done = doneDays.has(iso)
     const dot = done ? ' done' : ovr && eff ? ' ovr' : eff ? ' plan' : ''
     strip.push(<div key={i} className={'wday' + (iso === todayISO() ? ' today' : '')} onClick={() => dayOverrideSheet(iso)}>
       <div className="lbl">{t(DAYS[d.getDay()])}</div><div className="num">{d.getDate()}</div><div className={'dot' + dot} /></div>)
@@ -38,18 +83,28 @@ export default function Home() {
   const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6)
   const wkLabel = weekOffset === 0 ? t('This week') : `${monday.getDate()} ${monday.toLocaleDateString(dateLocale(), { month: 'short' })} – ${sunday.getDate()} ${sunday.toLocaleDateString(dateLocale(), { month: 'short' })}`
 
-  const wThisWeek = S.workouts.filter(w => weekKey(w.d) === weekKey(todayISO())).length
-  const plannedPerWeek = Object.keys(S.week).filter(k => S.week[k]).length
-  const bwPoints = S.bodyweight.slice(-30).map(b => ({ t: b.t || new Date(b.d).getTime(), y: b.w, d: b.d }))
+  const wThisWeek = workouts.filter(w => weekKey(w.d) === weekKey(todayISO())).length
+  const plannedPerWeek = Object.keys(week).filter(k => week[k]).length
+  const bwPoints = bodyweight.slice(-30).map(b => ({ t: b.t || new Date(b.d).getTime(), y: b.w, d: b.d }))
 
   // today's session shown right under the week strip
   const onToday = () => { if (S.active) nav('/workout'); else if (routine) startFlow(routine.id); else dayOverrideSheet(todayISO()) }
+  const doSignOut = () => confirmSheet({ title: t('Sign out?'), message: t('Your data is synced to your profile first, then cleared from this device.'), confirmText: t('Sign out'), danger: true, onConfirm: async () => { await signOut(); nav('/home'); toast(t('Signed out')) } })
 
   return <div className="narrow">
     <div className="hdr">
-      <div><h1>{user ? t('Hi {0}', user.name) : 'openGym'}</h1><div className="sub">{today.toLocaleDateString(dateLocale(), { weekday: 'long', day: 'numeric', month: 'long' })}</div></div>
-      <button className="iconbtn" onClick={() => nav('/settings')} aria-label={t('Settings')}><Icon name="gear" /></button>
+      <div><h1>{user ? t('Hi {0}', user.name) : appName}</h1><div className="sub">{today.toLocaleDateString(dateLocale(), { weekday: 'long', day: 'numeric', month: 'long' })}</div></div>
+      <div className="row" style={{ gap: 5 }}>
+        <NotificationBell user={user} />
+        {user && <button className="iconbtn" onClick={doSignOut} aria-label={t('Sign out')}><Icon name="signOut" /></button>}
+        <button className="iconbtn" onClick={() => nav('/settings')} aria-label={t('Settings')}><Icon name="gear" /></button>
+      </div>
     </div>
+
+    {user?.expiresAt && <div className="card" style={{ borderColor: user.expired ? 'var(--red)' : 'var(--yellow)', color: user.expired ? 'var(--red)' : 'var(--yellow)', marginBottom: 12 }}>
+      <div className="row" style={{ gap: 8 }}><Icon name="clock" /><span>{user.expired ? t('Your invited account has expired.') : t('Invited account expires {0}.', new Date(user.expiresAt).toLocaleDateString())}</span></div>
+      {!user.expired && user.canEditPlans === false && <div className="dim small" style={{ marginTop: 6 }}>{t('Plan and routine editing is disabled by an administrator.')}</div>}
+    </div>}
 
     <div className="card">
       <div className="row between" style={{ marginBottom: 8 }}>
@@ -74,7 +129,7 @@ export default function Home() {
       </div>
     </div>
 
-    {!S.routines.length && !S.active && (
+    {!routines.length && !S.active && (
       <div className="card">
         <div className="row" style={{ gap: 10, marginBottom: 6 }}>
           <span className="lrow-i"><Icon name="sparkles" /></span>
@@ -123,7 +178,7 @@ export default function Home() {
             <Icon name="flame" style={{ color: 'var(--orange)' }} />
             {t('{0} week streak', streakWeeks(S))}
           </div>
-          <div className="muted small" style={{ marginTop: 2 }}>{wThisWeek}{plannedPerWeek ? ' / ' + plannedPerWeek : ''} {t('this week')} · {t(S.workouts.length === 1 ? '{0} workout total' : '{0} workouts total', S.workouts.length)}</div>
+          <div className="muted small" style={{ marginTop: 2 }}>{wThisWeek}{plannedPerWeek ? ' / ' + plannedPerWeek : ''} {t('this week')} · {t(workouts.length === 1 ? '{0} workout total' : '{0} workouts total', workouts.length)}</div>
         </div>
         <Icon name="calendar" className="chev" style={{ fontSize: 20 }} />
       </div>

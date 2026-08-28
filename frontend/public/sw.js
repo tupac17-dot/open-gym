@@ -15,14 +15,15 @@ self.addEventListener('push', e => {
     icon: 'icon-512.png',
     badge: 'icon-180.png',
     tag: data.tag || 'opengym',
-    renotify: true
+    renotify: true,
+    data: { url: data.url || './' }
   }))
 })
 self.addEventListener('notificationclick', e => {
   e.notification.close()
   e.waitUntil(self.clients.matchAll({ type: 'window' }).then(clients => {
     const c = clients.find(c => 'focus' in c)
-    return c ? c.focus() : self.clients.openWindow('./')
+    return c ? c.focus() : self.clients.openWindow(e.notification.data?.url || './')
   }))
 })
 

@@ -439,6 +439,7 @@ export default {
   'Invite code': 'Κωδικός πρόσκλησης',
   'This app is invite-only — enter the code you were given.': 'Αυτή η εφαρμογή είναι μόνο με πρόσκληση — βάλε τον κωδικό που σου δόθηκε.',
   'An invite code is required': 'Απαιτείται κωδικός πρόσκλησης',
+  'Have an admin code? Enter it to get admin access.': 'Έχεις κωδικό διαχειριστή; Βάλε τον για πρόσβαση διαχειριστή.',
 
   'Muscle balance': 'Ισορροπία μυών',
   'by sets worked': 'ανά σετ εργασίας',

@@ -14,9 +14,10 @@ function RegisterSheet({ close, admin = false }) {
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
   const [inviteOnly, setInviteOnly] = useState(false)
+  const [adminCode, setAdminCode] = useState(false)
   const ref = useRef(null)
   useEffect(() => { setTimeout(() => ref.current?.focus(), 250) }, [])
-  useEffect(() => { loadConfig().then(c => setInviteOnly(!!c.invite_only)).catch(() => {}) }, [loadConfig])
+  useEffect(() => { loadConfig().then(c => { setInviteOnly(!!c.invite_only); setAdminCode(!!c.admin_code) }).catch(() => {}) }, [loadConfig])
   const go = async () => {
     const n = name.trim()
     if (!n) { useUI.getState().toast(t('Enter a name')); return }
@@ -36,11 +37,11 @@ function RegisterSheet({ close, admin = false }) {
         : t('Pick a name, then confirm with {0}. The passkey is saved in your device — no password needed.', BIO)}
     </div>
     <input ref={ref} className="input" placeholder={t('Your name')} maxLength={40} value={name} onChange={e => setName(e.target.value)} />
-    {!admin && inviteOnly && <>
+    {!admin && (inviteOnly || adminCode) && <>
       <div style={{ height: 10 }} />
       <input className="input" placeholder={t('Invite code')} maxLength={40} value={code}
         onChange={e => setCode(e.target.value.toUpperCase())} style={{ letterSpacing: '.14em', fontWeight: 600, textAlign: 'center' }} />
-      <div className="dim small" style={{ marginTop: 6 }}>{t('This app is invite-only — enter the code you were given.')}</div>
+      <div className="dim small" style={{ marginTop: 6 }}>{t(inviteOnly ? 'This app is invite-only — enter the code you were given.' : 'Have an admin code? Enter it to get admin access.')}</div>
     </>}
     <div style={{ height: 12 }} />
     <Button variant="primary" onClick={go}>{t('Create passkey')}</Button>

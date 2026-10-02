@@ -359,6 +359,7 @@ export default {
   'Invite code': 'Kod zaproszenia',
   'This app is invite-only — enter the code you were given.': 'Ta aplikacja jest tylko na zaproszenie — wpisz otrzymany kod.',
   'An invite code is required': 'Wymagany jest kod zaproszenia',
+  'Have an admin code? Enter it to get admin access.': 'Masz kod administratora? Wpisz go, aby uzyskać dostęp administratora.',
   'Admin dashboard': 'Panel administratora',
   // --- muscle map ---
   'Muscle balance': 'Równowaga mięśniowa',

@@ -219,10 +219,16 @@ All via `.env` (see `.env.example`):
 | `RP_NAME`     | Name shown in the passkey prompt                     | `openGym`               |
 | `ADMIN_UIDS`  | User ids that get the admin dashboard (comma-separated) | *(none)*             |
 | `INVITE_ONLY` | Require an invite code to create a profile           | *(off)*                 |
+| `ADMIN_INVITE_CODE` | Fixed code that grants admin to whoever registers with it | *(off)*          |
 
 On a fresh instance with no admin, the login screen offers **Create your admin** — the first
 profile created there becomes the admin, so you don't need to set `ADMIN_UIDS` by hand. The
 bootstrap closes permanently once an admin exists.
+
+If you lose the admin (fresh install, wiped `./data`), set `ADMIN_INVITE_CODE` to a secret of your
+choosing and restart. The login screen then shows an invite-code field: whoever registers with that
+exact code becomes an admin, even when an admin already exists. Treat it as a password and remove
+it from `.env` once you're back in.
 
 Push notification keys are generated on first run and saved to `./data/vapid.json` — nothing to set.
 

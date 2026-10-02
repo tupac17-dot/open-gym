@@ -359,6 +359,7 @@ export default {
   'Invite code': 'इनवाइट कोड',
   'This app is invite-only — enter the code you were given.': 'यह ऐप केवल इनवाइट से है — आपको दिया गया कोड डालें।',
   'An invite code is required': 'एक इनवाइट कोड आवश्यक है',
+  'Have an admin code? Enter it to get admin access.': 'एडमिन कोड है? एडमिन एक्सेस पाने के लिए इसे डालें।',
   'Admin dashboard': 'एडमिन डैशबोर्ड',
   // --- muscle map ---
   'Muscle balance': 'मांसपेशी संतुलन',

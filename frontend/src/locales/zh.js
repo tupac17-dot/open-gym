@@ -359,6 +359,7 @@ export default {
   'Invite code': '邀请码',
   'This app is invite-only — enter the code you were given.': '此应用仅限邀请——请输入你收到的邀请码。',
   'An invite code is required': '需要邀请码',
+  'Have an admin code? Enter it to get admin access.': '有管理员代码？输入即可获得管理员权限。',
   'Admin dashboard': '管理后台',
   // --- muscle map ---
   'Muscle balance': '肌肉平衡',

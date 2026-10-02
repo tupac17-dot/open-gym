@@ -359,6 +359,7 @@ export default {
   'Invite code': 'Davet kodu',
   'This app is invite-only — enter the code you were given.': 'Bu uygulama yalnızca davetle — sana verilen kodu gir.',
   'An invite code is required': 'Bir davet kodu gerekli',
+  'Have an admin code? Enter it to get admin access.': 'Yönetici kodun var mı? Yönetici erişimi için gir.',
   'Admin dashboard': 'Yönetici paneli',
   // --- muscle map ---
   'Muscle balance': 'Kas dengesi',

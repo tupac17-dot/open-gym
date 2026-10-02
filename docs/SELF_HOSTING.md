@@ -101,7 +101,13 @@ If you'd rather control who gets in, two optional settings in `.env` turn that a
 ```bash
 ADMIN_UIDS=youruserid      # comma-separated; these users get the admin dashboard
 INVITE_ONLY=1              # new profiles need an invite code
+ADMIN_INVITE_CODE=letmein  # fixed code; whoever registers with it becomes an admin
 ```
+
+`ADMIN_INVITE_CODE` is a recovery path: if you lose the admin (fresh install, wiped `./data`), set
+it to a secret and restart. The login screen then shows an invite-code field, and whoever registers
+with that exact code becomes an admin — even if an admin already exists. Treat it like a password
+and remove it from `.env` once you're back in.
 
 Register your own passkey profile first, then find your id in `./data/db.json` under `users[].id`
 and put it in `ADMIN_UIDS`. (Or just use the **Create your admin** button on first run — it does

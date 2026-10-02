@@ -19,6 +19,9 @@ const RP_NAME = process.env.RP_NAME || 'openGym';
 // code the admin generates. Both default off so a fresh self-hosted instance stays open.
 const ADMIN_UIDS = (process.env.ADMIN_UIDS || '').split(',').map(s => s.trim()).filter(Boolean);
 const INVITE_ONLY = /^(1|true|yes|on)$/i.test(process.env.INVITE_ONLY || '');
+// A fixed code that grants admin to whoever registers with it, even when an admin already exists —
+// a recovery path for a fresh install whose previous admin data is gone. Unset = disabled.
+const ADMIN_INVITE_CODE = String(process.env.ADMIN_INVITE_CODE || '').trim().toUpperCase();
 // 90 days keeps someone who trains a few times a week permanently signed in without a stolen
 // cookie staying good for a year. Overridable because a family instance and one on the open
 // internet don't want the same number. Only affects cookies minted from now on — the expiry is
@@ -283,7 +286,7 @@ const routes = {
   'GET /api/health': async (req, res) => json(res, 200, { ok: true, users: db.users.length }),
 
   // Public config the login screen needs before anyone is signed in.
-  'GET /api/config': async (req, res) => json(res, 200, { invite_only: INVITE_ONLY, appName: appName(), needs_admin: !hasAdmin() }),
+  'GET /api/config': async (req, res) => json(res, 200, { invite_only: INVITE_ONLY, admin_code: !!ADMIN_INVITE_CODE, appName: appName(), needs_admin: !hasAdmin() }),
 
   'GET /api/me': async (req, res) => {
     const user = readSession(req);
@@ -295,10 +298,12 @@ const routes = {
     const body = await readBody(req);
     const name = String(body.name || '').trim().slice(0, 40);
     if (!name) return json(res, 400, { error: 'name required' });
-    // First-run bootstrap: the very first profile may claim admin, but only while none exists.
-    const wantsAdmin = body.admin === true;
-    if (wantsAdmin && hasAdmin()) return json(res, 409, { error: 'an admin already exists' });
     const code = String(body.code || '').trim().toUpperCase();
+    // The fixed admin code always grants admin, even when one already exists — it's the recovery path.
+    const isAdminCode = !!ADMIN_INVITE_CODE && code === ADMIN_INVITE_CODE;
+    // First-run bootstrap: the very first profile may claim admin, but only while none exists.
+    const wantsAdmin = body.admin === true || isAdminCode;
+    if (wantsAdmin && hasAdmin() && !isAdminCode) return json(res, 409, { error: 'an admin already exists' });
     // The bootstrap admin bypasses invite-only — there's no admin yet to mint a code.
     if (INVITE_ONLY && !wantsAdmin && !db.invites.some(i => i.code === code && !i.usedBy && !i.revoked))
       return json(res, 403, { error: 'a valid invite code is required' });
@@ -310,7 +315,7 @@ const routes = {
       authenticatorSelection: { residentKey: 'required', userVerification: 'preferred' },
       excludeCredentials: []
     });
-    const cid = putChallenge({ challenge: options.challenge, name, uid, code, admin: wantsAdmin });
+    const cid = putChallenge({ challenge: options.challenge, name, uid, code, admin: wantsAdmin, adminCode: isAdminCode });
     json(res, 200, { cid, options });
   },
 
@@ -341,7 +346,8 @@ const routes = {
     const user = { id: c.uid, name: c.name, created: new Date().toISOString(), planEditingOverride: null, expiresAt: null };
     // Re-check at verify: if two people raced the bootstrap, the first to finish wins and the
     // loser is still created as a regular profile (avoids an orphaned passkey on their device).
-    if (c.admin && !hasAdmin()) user.admin = true;
+    // The fixed admin code always wins, even when an admin already exists.
+    if (c.adminCode || (c.admin && !hasAdmin())) user.admin = true;
     if (invite) { user.invitedBy = invite.code; invite.usedBy = user.id; invite.usedAt = user.created; }
     db.users.push(user);
     db.creds.push({

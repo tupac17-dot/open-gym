@@ -19,7 +19,7 @@ export const DEF = {
   reminder: { on: false, time: '08:00', tz: null }, effort: null,
   plans: [], activePlanId: null, allRoutines: []
 }
-const DEFAULT_CONFIG = { appName: 'openGym', invite_only: false }
+const DEFAULT_CONFIG = { appName: 'openGym', invite_only: false, admin_code: false }
 const clone = o => JSON.parse(JSON.stringify(o))
 const normalizeConfig = c => ({ ...DEFAULT_CONFIG, ...(c || {}), appName: String(c?.appName || DEFAULT_CONFIG.appName).trim() || DEFAULT_CONFIG.appName })
 

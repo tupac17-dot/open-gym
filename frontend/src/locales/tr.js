@@ -215,6 +215,8 @@ export default {
   'Registration failed': 'Kayıt başarısız',
   'Sign-in failed': 'Giriş başarısız',
   'Create your profile': 'Profilini oluştur',
+  'Create your admin': 'Yöneticini oluştur',
+  'This instance has no administrator yet — the first profile becomes the admin.': 'Bu örnekte henüz yönetici yok — ilk profil yönetici olur.',
   'Pick a name, then confirm with {0}. The passkey is saved in your device — no password needed.': 'Bir isim seç, sonra {0} ile onayla. Geçiş anahtarı cihazına kaydedilir — şifre gerekmez.',
   'Pick a name, then confirm with your device.': 'Bir isim seç, sonra cihazınla onayla.',
   'Your name': 'İsmin',

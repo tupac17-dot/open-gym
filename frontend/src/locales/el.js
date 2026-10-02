@@ -289,6 +289,8 @@ export default {
   'Registration failed': 'Η εγγραφή απέτυχε',
   'Sign-in failed': 'Η σύνδεση απέτυχε',
   'Create your profile': 'Δημιουργία προφίλ',
+  'Create your admin': 'Δημιούργησε τον διαχειριστή σου',
+  'This instance has no administrator yet — the first profile becomes the admin.': 'Αυτή η εγκατάσταση δεν έχει ακόμη διαχειριστή — το πρώτο προφίλ γίνεται διαχειριστής.',
   'Pick a name, then confirm with {0}. The passkey is saved in your device — no password needed.': 'Διάλεξε όνομα και επιβεβαίωσε με {0}. Το passkey αποθηκεύεται στη συσκευή σου — δεν χρειάζεται κωδικός.',
   'Pick a name, then confirm with your device.': 'Διάλεξε όνομα και επιβεβαίωσε με τη συσκευή σου.',
   'Your name': 'Το όνομά σου',

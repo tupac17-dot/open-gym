@@ -215,6 +215,8 @@ export default {
   'Registration failed': '注册失败',
   'Sign-in failed': '登录失败',
   'Create your profile': '创建你的档案',
+  'Create your admin': '创建你的管理员',
+  'This instance has no administrator yet — the first profile becomes the admin.': '此实例还没有管理员——第一个档案将成为管理员。',
   'Pick a name, then confirm with {0}. The passkey is saved in your device — no password needed.': '取个名字，然后用{0}确认。通行密钥保存在你的设备上——无需密码。',
   'Pick a name, then confirm with your device.': '取个名字，然后用设备确认。',
   'Your name': '你的名字',

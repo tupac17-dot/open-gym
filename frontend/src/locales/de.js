@@ -228,6 +228,8 @@ export default {
   'Registration failed': 'Registrierung fehlgeschlagen',
   'Sign-in failed': 'Anmeldung fehlgeschlagen',
   'Create your profile': 'Erstelle dein Profil',
+  'Create your admin': 'Erstelle deinen Admin',
+  'This instance has no administrator yet — the first profile becomes the admin.': 'Diese Instanz hat noch keinen Administrator — das erste Profil wird der Admin.',
   'Pick a name, then confirm with {0}. The passkey is saved in your device — no password needed.': 'Wähle einen Namen und bestätige mit {0}. Der Passkey wird auf deinem Gerät gespeichert — kein Passwort nötig.',
   'Pick a name, then confirm with your device.': 'Wähle einen Namen und bestätige mit deinem Gerät.',
   'Your name': 'Dein Name',

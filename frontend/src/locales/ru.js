@@ -215,6 +215,8 @@ export default {
   'Registration failed': 'Регистрация не удалась',
   'Sign-in failed': 'Вход не удался',
   'Create your profile': 'Создай свой профиль',
+  'Create your admin': 'Создай своего администратора',
+  'This instance has no administrator yet — the first profile becomes the admin.': 'У этого экземпляра ещё нет администратора — первый профиль станет администратором.',
   'Pick a name, then confirm with {0}. The passkey is saved in your device — no password needed.': 'Выбери имя и подтверди через {0}. Ключ доступа сохраняется на устройстве — пароль не нужен.',
   'Pick a name, then confirm with your device.': 'Выбери имя и подтверди на устройстве.',
   'Your name': 'Твоё имя',

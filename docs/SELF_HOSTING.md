@@ -90,6 +90,12 @@ Visit `https://gym.example.com`, create your profile, and add it to your home sc
 Anyone who can reach the URL can create their own profile — each gets isolated data. That's the
 default: open signup, no admin.
 
+On a **fresh instance with no admin yet**, the login screen shows a **Create your admin** button:
+the first profile created there becomes the admin automatically, so you don't have to hand-edit
+`.env` to get the dashboard. Once an admin exists the button disappears and the bootstrap path is
+closed for good. (If you expose the URL before setting up, the first visitor could claim admin —
+set `ADMIN_UIDS` or finish first-run before going public.)
+
 If you'd rather control who gets in, two optional settings in `.env` turn that around:
 
 ```bash
@@ -98,7 +104,8 @@ INVITE_ONLY=1              # new profiles need an invite code
 ```
 
 Register your own passkey profile first, then find your id in `./data/db.json` under `users[].id`
-and put it in `ADMIN_UIDS`. You'll get an **Admin dashboard** link in Settings: who's training
+and put it in `ADMIN_UIDS`. (Or just use the **Create your admin** button on first run — it does
+the same thing without editing files.) You'll get an **Admin dashboard** link in Settings: who's training
 right now, each user's workout history and body weight, the ability to disable an account (signed
 out and locked out everywhere until you re-enable it), and — with `INVITE_ONLY=1` — generating and
 revoking invite codes. Existing accounts keep working when you switch invite-only on. Admin access

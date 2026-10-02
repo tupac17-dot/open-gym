@@ -220,6 +220,10 @@ All via `.env` (see `.env.example`):
 | `ADMIN_UIDS`  | User ids that get the admin dashboard (comma-separated) | *(none)*             |
 | `INVITE_ONLY` | Require an invite code to create a profile           | *(off)*                 |
 
+On a fresh instance with no admin, the login screen offers **Create your admin** — the first
+profile created there becomes the admin, so you don't need to set `ADMIN_UIDS` by hand. The
+bootstrap closes permanently once an admin exists.
+
 Push notification keys are generated on first run and saved to `./data/vapid.json` — nothing to set.
 
 ## Roadmap

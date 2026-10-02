@@ -215,6 +215,8 @@ export default {
   'Registration failed': '등록 실패',
   'Sign-in failed': '로그인 실패',
   'Create your profile': '프로필 만들기',
+  'Create your admin': '관리자 만들기',
+  'This instance has no administrator yet — the first profile becomes the admin.': '이 인스턴스에는 아직 관리자가 없습니다 — 첫 프로필이 관리자가 됩니다.',
   'Pick a name, then confirm with {0}. The passkey is saved in your device — no password needed.': '이름을 정한 뒤 {0}(으)로 확인하세요. 패스키는 기기에 저장됩니다 — 비밀번호가 필요 없어요.',
   'Pick a name, then confirm with your device.': '이름을 정한 뒤 기기로 확인하세요.',
   'Your name': '이름',

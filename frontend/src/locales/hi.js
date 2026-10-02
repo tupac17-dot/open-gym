@@ -215,6 +215,8 @@ export default {
   'Registration failed': 'पंजीकरण विफल',
   'Sign-in failed': 'साइन-इन विफल',
   'Create your profile': 'अपनी प्रोफ़ाइल बनाएँ',
+  'Create your admin': 'अपना एडमिन बनाएँ',
+  'This instance has no administrator yet — the first profile becomes the admin.': 'इस इंस्टेंस में अभी कोई एडमिन नहीं है — पहली प्रोफ़ाइल एडमिन बन जाएगी।',
   'Pick a name, then confirm with {0}. The passkey is saved in your device — no password needed.': 'नाम चुनें, फिर {0} से पुष्टि करें। पासकी आपके डिवाइस में सहेजी जाती है — पासवर्ड की ज़रूरत नहीं।',
   'Pick a name, then confirm with your device.': 'नाम चुनें, फिर अपने डिवाइस से पुष्टि करें।',
   'Your name': 'आपका नाम',

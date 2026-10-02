@@ -47,6 +47,8 @@ db.notifications = db.notifications || [];
 if (db.settings.invitedPlanEditingEnabled === undefined) db.settings.invitedPlanEditingEnabled = true;
 if (typeof db.settings.appName !== 'string' || !db.settings.appName.trim()) db.settings.appName = 'openGym';
 const isAdmin = user => !!user && (user.admin === true || ADMIN_UIDS.includes(user.id));
+// True while nobody holds admin — gates the first-run "create your admin" bootstrap.
+const hasAdmin = () => db.users.some(isAdmin);
 const appName = () => String(db.settings.appName || 'openGym').trim().slice(0, 40) || 'openGym';
 const isExpired = user => !!user?.expiresAt && new Date(user.expiresAt).getTime() <= Date.now();
 function planFingerprint(state) {
@@ -281,7 +283,7 @@ const routes = {
   'GET /api/health': async (req, res) => json(res, 200, { ok: true, users: db.users.length }),
 
   // Public config the login screen needs before anyone is signed in.
-  'GET /api/config': async (req, res) => json(res, 200, { invite_only: INVITE_ONLY, appName: appName() }),
+  'GET /api/config': async (req, res) => json(res, 200, { invite_only: INVITE_ONLY, appName: appName(), needs_admin: !hasAdmin() }),
 
   'GET /api/me': async (req, res) => {
     const user = readSession(req);
@@ -293,8 +295,12 @@ const routes = {
     const body = await readBody(req);
     const name = String(body.name || '').trim().slice(0, 40);
     if (!name) return json(res, 400, { error: 'name required' });
+    // First-run bootstrap: the very first profile may claim admin, but only while none exists.
+    const wantsAdmin = body.admin === true;
+    if (wantsAdmin && hasAdmin()) return json(res, 409, { error: 'an admin already exists' });
     const code = String(body.code || '').trim().toUpperCase();
-    if (INVITE_ONLY && !db.invites.some(i => i.code === code && !i.usedBy && !i.revoked))
+    // The bootstrap admin bypasses invite-only — there's no admin yet to mint a code.
+    if (INVITE_ONLY && !wantsAdmin && !db.invites.some(i => i.code === code && !i.usedBy && !i.revoked))
       return json(res, 403, { error: 'a valid invite code is required' });
     const uid = crypto.randomBytes(12).toString('base64url');
     const options = await generateRegistrationOptions({
@@ -304,7 +310,7 @@ const routes = {
       authenticatorSelection: { residentKey: 'required', userVerification: 'preferred' },
       excludeCredentials: []
     });
-    const cid = putChallenge({ challenge: options.challenge, name, uid, code });
+    const cid = putChallenge({ challenge: options.challenge, name, uid, code, admin: wantsAdmin });
     json(res, 200, { cid, options });
   },
 
@@ -326,12 +332,16 @@ const routes = {
     const { credential } = verification.registrationInfo;
     if (db.creds.find(x => x.id === credential.id)) return json(res, 409, { error: 'credential already registered' });
     // Re-check the invite at the last moment (it may have been used/revoked since options), then burn it.
+    // The bootstrap admin skips this — it's the account that would otherwise issue the codes.
     let invite = null;
-    if (INVITE_ONLY) {
+    if (INVITE_ONLY && !c.admin) {
       invite = db.invites.find(i => i.code === c.code && !i.usedBy && !i.revoked);
       if (!invite) return json(res, 403, { error: 'invite code is no longer valid — ask for a new one' });
     }
     const user = { id: c.uid, name: c.name, created: new Date().toISOString(), planEditingOverride: null, expiresAt: null };
+    // Re-check at verify: if two people raced the bootstrap, the first to finish wins and the
+    // loser is still created as a regular profile (avoids an orphaned passkey on their device).
+    if (c.admin && !hasAdmin()) user.admin = true;
     if (invite) { user.invitedBy = invite.code; invite.usedBy = user.id; invite.usedAt = user.created; }
     db.users.push(user);
     db.creds.push({
